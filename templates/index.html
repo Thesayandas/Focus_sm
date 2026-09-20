@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GiftDrop — You Have a Surprise!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/static/js/confetti.browser.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#1a0533;--bg2:#0d1b4b;--bg3:#0a2a3d;
+  --pink:#ff6eb4;--purple:#a855f7;--blue:#38bdf8;--gold:#fbbf24;--green:#34d399;
+  --card:rgba(255,255,255,0.07);--border:rgba(255,255,255,0.12);
+  --text:#f0e6ff;--muted:rgba(240,230,255,0.55);
+  --radius:20px;--shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+html,body{min-height:100vh;font-family:'Nunito',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{background:linear-gradient(135deg,var(--bg1) 0%,var(--bg2) 50%,var(--bg3) 100%);color:var(--text);position:relative}
+
+/* ─── canvas ─── */
+#fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ─── floating ring orbs ─── */
+.orbs-layer{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.orb-ring{position:absolute;border-radius:50%;animation:orbRise linear infinite;opacity:0}
+@keyframes orbRise{
+  0%  {bottom:-120px;opacity:0;transform:translateX(0) rotate(0deg) scale(1)}
+  8%  {opacity:1}
+  92% {opacity:.7}
+  100%{bottom:110vh;opacity:0;transform:translateX(var(--drift)) rotate(360deg) scale(var(--sc))}
+}
+
+/* ─── sparkles ─── */
+.sparkle{position:fixed;pointer-events:none;z-index:1;animation:sparkleAnim var(--dur,1.5s) ease-in-out infinite var(--del,0s)}
+@keyframes sparkleAnim{
+  0%,100%{opacity:0;transform:scale(0) rotate(0deg)}
+  50%{opacity:1;transform:scale(1) rotate(180deg)}
+}
+
+/* ─── parallax wrapper ─── */
+#parallax{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px 16px 40px;transition:opacity .5s}
+
+/* ─── STAGES ─── */
+.stage{display:none;width:100%;max-width:540px;margin:0 auto;flex-direction:column;align-items:center;gap:0}
+.stage.active{display:flex;animation:stageIn .55s cubic-bezier(.22,1,.36,1)}
+@keyframes stageIn{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ─── STAGE 1: Hero ─── */
+.hero-brand{display:flex;align-items:center;gap:8px;margin-bottom:28px;animation:fadeDown .6s .1s both}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+.hero-brand-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);animation:dotPulse 2s infinite}
+@keyframes dotPulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}50%{box-shadow:0 0 0 7px rgba(251,191,36,0)}}
+.hero-brand-name{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:1.5px;text-transform:uppercase}
+
+/* character + gift scene */
+.scene{position:relative;width:300px;height:300px;margin:0 auto 8px}
+.scene svg{width:100%;height:100%}
+
+/* gift box shake */
+.gift-box{cursor:pointer;transition:transform .2s;transform-origin:center bottom}
+.gift-box:hover{transform:scale(1.04)}
+.gift-shake{animation:giftShake 2.5s ease-in-out infinite}
+@keyframes giftShake{
+  0%,100%{transform:rotate(0deg) scale(1)}
+  10%{transform:rotate(-4deg) scale(1.02)}
+  20%{transform:rotate(4deg) scale(1.02)}
+  30%{transform:rotate(-3deg) scale(1.01)}
+  40%{transform:rotate(3deg) scale(1.01)}
+  50%,90%{transform:rotate(0deg) scale(1)}
+}
+.gift-open{animation:giftOpen .6s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes giftOpen{
+  0%{transform:scale(1) rotate(0)}
+  30%{transform:scale(1.15) rotate(-5deg)}
+  60%{transform:scale(0.9) rotate(3deg)}
+  100%{transform:scale(0) rotate(10deg);opacity:0}
+}
+
+/* floating character */
+.char-float{animation:charFloat 4s ease-in-out infinite}
+@keyframes charFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+
+/* hero text */
+.hero-title{font-size:clamp(26px,6vw,36px);font-weight:900;text-align:center;line-height:1.2;margin-bottom:10px;animation:fadeUp .6s .3s both}
+.hero-title span{background:linear-gradient(135deg,#fbbf24,#f472b6,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sub{font-size:15px;color:var(--muted);text-align:center;line-height:1.65;margin-bottom:30px;animation:fadeUp .6s .45s both;max-width:340px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* CTA button */
+.btn-main{
+  padding:17px 44px;border-radius:50px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#b5488a,#7a3db5,#2a8aaf);
+  color:rgba(255,255,255,0.9);font-family:'Nunito',sans-serif;font-size:18px;font-weight:900;
+  position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;
+  box-shadow:0 6px 22px rgba(120,60,180,.35);animation:fadeUp .6s .55s both;
+  letter-spacing:.3px;
+}
+.btn-main::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.25) 50%,rgba(255,255,255,0) 100%);
+  transform:translateX(-100%) skewX(-15deg);
+}
+.btn-main:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 14px 40px rgba(168,85,247,.6)}
+.btn-main:hover::after{transform:translateX(200%) skewX(-15deg);transition:transform .6s ease}
+.btn-main:active{transform:scale(.98)}
+
+/* ─── GLASS CARD ─── */
+.glass-card{
+  width:100%;background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  padding:36px 28px;box-shadow:var(--shadow),0 0 0 1px rgba(255,255,255,.05) inset;
+  position:relative;overflow:hidden;
+}
+.glass-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+}
+.card-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;background:linear-gradient(135deg,rgba(168,85,247,.25),rgba(56,189,248,.15));border:1px solid rgba(168,85,247,.35)}
+.card-title{font-size:22px;font-weight:900;text-align:center;margin-bottom:8px;line-height:1.25}
+.card-sub{font-size:13.5px;color:var(--muted);text-align:center;line-height:1.65;margin-bottom:24px}
+
+/* step dots */
+.step-dots{display:flex;gap:8px;justify-content:center;margin-bottom:28px}
+.dot-step{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15);transition:all .3s}
+.dot-step.on{width:24px;border-radius:4px;background:var(--purple)}
+.dot-step.done{background:var(--green)}
+
+/* info box */
+.info-box{padding:13px 15px;border-radius:12px;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);font-size:12.5px;color:var(--muted);line-height:1.7;display:flex;gap:10px;align-items:flex-start;margin-bottom:18px}
+.info-box svg{flex-shrink:0;margin-top:2px;color:var(--purple)}
+.info-box b{color:rgba(240,230,255,.85)}
+
+/* google btn */
+.btn-google{
+  width:100%;padding:14px 20px;border-radius:14px;background:#fff;color:#1a1a1a;
+  font-family:'Inter',sans-serif;font-size:14.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;border:none;transition:all .2s;
+  box-shadow:0 2px 12px rgba(0,0,0,.3);text-decoration:none;
+  position:relative;overflow:hidden;
+}
+.btn-google::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.3),rgba(255,255,255,0));transform:translateX(-100%)}
+.btn-google:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.btn-google:hover::after{transform:translateX(200%);transition:transform .5s}
+
+/* user chip */
+.user-chip{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--border);margin-bottom:20px}
+.user-chip img{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid rgba(168,85,247,.4)}
+.chip-info{flex:1}
+.chip-name{font-size:14px;font-weight:800;color:var(--text)}
+.chip-email{font-size:12px;color:var(--muted);margin-top:1px}
+.chip-badge{font-size:10.5px;font-weight:700;color:var(--green);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);padding:3px 9px;border-radius:20px;white-space:nowrap}
+
+/* optional tag */
+.optional-tag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--gold);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle}
+
+/* phone input */
+.field-label{font-size:11px;font-weight:700;color:rgba(240,230,255,.4);letter-spacing:.7px;text-transform:uppercase;margin-bottom:8px}
+.phone-wrap{display:flex;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid var(--border);overflow:hidden;transition:border-color .2s,box-shadow .2s;margin-bottom:6px}
+.phone-wrap:focus-within{border-color:rgba(168,85,247,.55);box-shadow:0 0 0 3px rgba(168,85,247,.12)}
+select.dial{background:rgba(255,255,255,.06);border:none;border-right:1px solid var(--border);color:var(--muted);font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;padding:13px 8px 13px 12px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
+select.dial option{background:#1a0533;color:#f0e6ff}
+input.phone-input{flex:1;background:transparent;border:none;color:var(--text);font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;padding:13px 14px;outline:none;letter-spacing:.5px}
+input.phone-input::placeholder{color:rgba(240,230,255,.25);font-weight:400;letter-spacing:0}
+
+/* OTP row */
+.otp-section{display:none;flex-direction:column;gap:10px;animation:fadeUp .4s both}
+.otp-section.show{display:flex}
+.otp-row{display:flex;gap:8px;justify-content:center}
+.otp-input{
+  width:48px;height:56px;border-radius:12px;border:1.5px solid var(--border);
+  background:rgba(255,255,255,.06);color:var(--text);font-family:'Nunito',sans-serif;
+  font-size:22px;font-weight:900;text-align:center;outline:none;transition:all .2s;
+  -webkit-appearance:none;
+}
+.otp-input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(168,85,247,.15);background:rgba(168,85,247,.08)}
+.otp-hint{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+
+/* buttons */
+.btn-primary{
+  width:100%;padding:14px 20px;border-radius:14px;
+  background:linear-gradient(135deg,#a855f7,#6366f1);
+  color:#fff;font-family:'Nunito',sans-serif;font-size:15px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;border:none;transition:all .2s;
+  box-shadow:0 4px 20px rgba(168,85,247,.35);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(168,85,247,.5)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{width:100%;padding:12px 20px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.btn-row{display:flex;flex-direction:column;gap:10px;width:100%}
+
+/* privacy footer */
+.privacy-note{font-size:11.5px;color:rgba(240,230,255,.3);text-align:center;line-height:1.6;margin-top:16px}
+
+/* ─── STAGE 4: SUCCESS ─── */
+.success-scene{width:100%;text-align:center;padding:6px 0 16px;position:relative}
+.sunburst-wrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:260px;height:260px;pointer-events:none;z-index:0;opacity:.22}
+.sunburst-spin{width:100%;height:100%;animation:sunburstSpin 24s linear infinite}
+@keyframes sunburstSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.success-char{width:clamp(160px,45vw,210px);margin:0 auto 0;position:relative;z-index:1;animation:celebFloat 2.8s ease-in-out infinite}
+@keyframes celebFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-14px) rotate(2deg)}}
+.success-title{font-size:clamp(26px,6.5vw,38px);font-weight:900;line-height:1.2;margin-bottom:8px}
+.success-title span{background:linear-gradient(135deg,#fbbf24,#f472b6,#34d399);-webkit-background-clip:text;background-clip:text;color:transparent}
+.success-sub{font-size:clamp(13px,3.6vw,15px);color:var(--muted);line-height:1.65;margin-bottom:20px;max-width:340px;margin-left:auto;margin-right:auto}
+.success-card{
+  padding:clamp(14px,3.5vw,20px) clamp(16px,4vw,22px);border-radius:18px;
+  background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(56,189,248,.1));
+  border:1px solid rgba(168,85,247,.25);
+  display:flex;align-items:center;gap:12px;margin-bottom:16px;text-align:left;width:100%;max-width:420px;
+}
+.success-card-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(168,85,247,.3),rgba(56,189,248,.2));border:1px solid rgba(168,85,247,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.success-card-name{font-size:14.5px;font-weight:900;color:var(--text);word-break:break-word}
+.success-card-email{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
+
+/* ─── CARTOON ANIMATION KEYFRAMES ─── */
+.char-eye{transform-origin:center;animation:eyeBlink 3.8s infinite}
+@keyframes eyeBlink{0%,88%,100%{transform:scaleY(1)}94%{transform:scaleY(0.1)}}
+
+.char-ear-l{transform-origin:52px 68px;animation:earWiggle 4.5s 0.8s ease-in-out infinite}
+.char-ear-r{transform-origin:138px 68px;animation:earWiggle 4.5s 2.2s ease-in-out infinite}
+@keyframes earWiggle{0%,85%,100%{transform:rotate(0deg)}90%{transform:rotate(-10deg)}95%{transform:rotate(10deg)}}
+
+.ear-star{transform-origin:130px 62px;animation:starTwinkle 2.2s ease-in-out infinite}
+@keyframes starTwinkle{0%,100%{transform:scale(1) rotate(0deg);opacity:.85}50%{transform:scale(1.3) rotate(22deg);opacity:1;filter:drop-shadow(0 0 6px #fbbf24)}}
+
+/* Peeker cartoon above glass cards */
+.peeker-wrap{display:flex;justify-content:center;margin-bottom:-16px;position:relative;z-index:3;pointer-events:none}
+.peeker-svg{width:clamp(110px,28vw,140px);height:auto;filter:drop-shadow(0 8px 20px rgba(168,85,247,.38));animation:peekerBob 3.2s ease-in-out infinite}
+@keyframes peekerBob{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(1.5deg)}}
+
+/* Floating cartoon balloons */
+.balloon{position:absolute;border-radius:50% 50% 50% 50% / 40% 40% 60% 60%;animation:balloonFloat linear infinite;opacity:0;pointer-events:none;display:flex;justify-content:center}
+.balloon-string{position:absolute;top:98%;width:1.5px;height:45px;background:rgba(255,255,255,.2);transform-origin:top center;animation:stringWave 2.4s ease-in-out infinite alternate}
+@keyframes stringWave{0%{transform:rotate(-8deg)}100%{transform:rotate(8deg)}}
+@keyframes balloonFloat{
+  0%  {bottom:-120px;opacity:0;transform:translateX(0) rotate(-4deg) scale(1)}
+  8%  {opacity:0.75}
+  90% {opacity:0.65}
+  100%{bottom:112vh;opacity:0;transform:translateX(var(--drift)) rotate(8deg) scale(var(--sc))}
+}
+
+/* Pulsing gradient border on hero CTA */
+@keyframes borderPulse{0%,100%{box-shadow:0 6px 22px rgba(120,60,180,.35),0 0 0 0 rgba(120,60,180,.25)}50%{box-shadow:0 8px 30px rgba(120,60,180,.55),0 0 0 12px rgba(120,60,180,0)}}
+.btn-main{animation:fadeUp .6s .55s both, borderPulse 2.5s 1.2s ease infinite;width:min(100%, 310px);text-align:center}
+
+/* ─── FULL MOBILE RESPONSIVENESS ─── */
+@media (max-width: 640px) {
+  #parallax{padding:max(16px, env(safe-area-inset-top)) 14px max(24px, env(safe-area-inset-bottom));justify-content:flex-start}
+  .stage{max-width:100%}
+  .hero-brand{margin-bottom:16px}
+  .scene{width:clamp(220px,65vw,270px);height:clamp(220px,65vw,270px);margin-bottom:4px}
+  .hero-title{font-size:clamp(22px,6vw,28px);margin-bottom:8px}
+  .hero-sub{font-size:14px;line-height:1.55;margin-bottom:20px;max-width:310px}
+  .glass-card{padding:24px 18px;border-radius:18px}
+  .card-title{font-size:19px;margin-bottom:6px}
+  .card-sub{font-size:13px;margin-bottom:16px;line-height:1.55}
+  .info-box{font-size:12px;padding:11px 12px;gap:8px;margin-bottom:16px}
+  .btn-google{font-size:14px;padding:13px 16px;min-height:48px}
+  .btn-primary{font-size:14.5px;padding:13px 16px;min-height:48px}
+  select.dial{font-size:13px;padding:12px 6px 12px 10px}
+  input.phone-input{font-size:14.5px;padding:12px 10px;min-width:0}
+  .user-chip{padding:9px 12px;gap:8px;margin-bottom:16px}
+  .chip-name{font-size:13.5px}
+  .chip-email{font-size:11.5px}
+  .otp-input{width:clamp(38px,11vw,46px);height:50px;font-size:19px}
+}
+
+@media (max-width: 380px) {
+  .scene{width:190px;height:190px}
+  .hero-title{font-size:21px}
+  .hero-sub{font-size:12.5px}
+  .glass-card{padding:20px 14px;border-radius:16px}
+  .card-title{font-size:17.5px}
+  .peeker-svg{width:105px}
+  .btn-main{padding:14px 22px;font-size:16px}
+  select.dial{font-size:12px;padding:10px 4px 10px 6px}
+  input.phone-input{font-size:13.5px;padding:10px 6px}
+}
+
+/* loading spinner */
+.spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* error shake */
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.shake{animation:shake .35s ease}
+</style>
+</head>
+<body>
+
+<canvas id="fx"></canvas>
+
+<!-- Floating ring orbs -->
+<div class="orbs-layer" id="orbsLayer"></div>
+
+<!-- Sparkles injected by JS -->
+
+<div id="parallax">
+
+  <!-- ════════ STAGE 1 – HERO ════════ -->
+  <div class="stage active" id="s1">
+    <div class="hero-brand">
+      <div class="hero-brand-dot"></div>
+      <span class="hero-brand-name">GiftDrop</span>
+      <span style="font-size:11px;color:rgba(251,191,36,.5);font-family:'Inter',sans-serif;font-weight:600;margin-left:4px">BY YOUR FRIEND</span>
+    </div>
+
+    <!-- Character + Gift Scene (SVG) -->
+    <div class="scene" id="heroScene">
+      <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background glow -->
+        <radialGradient id="glowGrad" cx="50%" cy="65%" r="40%">
+          <stop offset="0%" stop-color="#a855f7" stop-opacity=".3"/>
+          <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+        </radialGradient>
+        <ellipse cx="150" cy="250" rx="90" ry="20" fill="url(#glowGrad)"/>
+
+        <!-- ══ CUTE BEAR CHARACTER ══ -->
+        <g class="char-float" transform="translate(55, 35)">
+          <!-- Body -->
+          <ellipse cx="95" cy="155" rx="52" ry="58" fill="#f9c784"/>
+          <!-- Tummy -->
+          <ellipse cx="95" cy="165" rx="32" ry="36" fill="#fde8b8"/>
+          <!-- Left ear -->
+          <g class="char-ear-l">
+            <circle cx="52" cy="68" r="22" fill="#f9c784"/>
+            <circle cx="52" cy="68" r="14" fill="#f4a95d"/>
+          </g>
+          <!-- Right ear -->
+          <g class="char-ear-r">
+            <circle cx="138" cy="68" r="22" fill="#f9c784"/>
+            <circle cx="138" cy="68" r="14" fill="#f4a95d"/>
+          </g>
+          <!-- Head -->
+          <circle cx="95" cy="92" r="52" fill="#f9c784"/>
+          <!-- Face blush -->
+          <ellipse cx="68" cy="102" rx="14" ry="9" fill="#f8a7c0" opacity=".6"/>
+          <ellipse cx="122" cy="102" rx="14" ry="9" fill="#f8a7c0" opacity=".6"/>
+          <!-- Eyes (blinking animation) -->
+          <g class="char-eye">
+            <circle cx="80" cy="88" r="10" fill="#2d1b69"/>
+            <circle cx="110" cy="88" r="10" fill="#2d1b69"/>
+            <!-- Eye shine -->
+            <circle cx="84" cy="84" r="3.5" fill="white"/>
+            <circle cx="114" cy="84" r="3.5" fill="white"/>
+            <circle cx="77" cy="91" r="1.5" fill="white"/>
+            <circle cx="107" cy="91" r="1.5" fill="white"/>
+          </g>
+          <!-- Nose -->
+          <ellipse cx="95" cy="100" rx="8" ry="5.5" fill="#c2763a"/>
+          <!-- Mouth smile -->
+          <path d="M83 110 Q95 122 107 110" stroke="#c2763a" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+          <!-- Arms (holding gift) -->
+          <!-- Left arm down -->
+          <path d="M43 148 Q22 175 35 205" stroke="#f9c784" stroke-width="24" stroke-linecap="round" fill="none"/>
+          <!-- Right arm down -->
+          <path d="M147 148 Q168 175 155 205" stroke="#f9c784" stroke-width="24" stroke-linecap="round" fill="none"/>
+          <!-- Left paw -->
+          <circle cx="33" cy="207" r="13" fill="#f4a95d"/>
+          <!-- Right paw -->
+          <circle cx="157" cy="207" r="13" fill="#f4a95d"/>
+          <!-- Star on ear (accessory with twinkle) -->
+          <text x="130" y="62" font-size="16" text-anchor="middle" fill="#fbbf24" class="ear-star">★</text>
+        </g>
+
+        <!-- ══ GIFT BOX ══ -->
+        <g id="giftGroup" class="gift-shake gift-box" transform="translate(90,190)" onclick="openGift()">
+          <!-- Box shadow -->
+          <ellipse cx="60" cy="88" rx="52" ry="8" fill="rgba(0,0,0,.25)"/>
+          <!-- Box body -->
+          <rect x="10" y="40" width="100" height="62" rx="6" fill="#e84393"/>
+          <!-- Box lid -->
+          <rect x="6" y="26" width="108" height="22" rx="6" fill="#c91a77"/>
+          <!-- Ribbon vertical -->
+          <rect x="53" y="26" width="14" height="76" fill="#fbbf24" rx="3"/>
+          <!-- Ribbon horizontal -->
+          <rect x="6" y="34" width="108" height="14" fill="#fbbf24" rx="3"/>
+          <!-- Bow left loop -->
+          <ellipse cx="47" cy="22" rx="20" ry="11" fill="#fde047" transform="rotate(-20,47,22)"/>
+          <!-- Bow right loop -->
+          <ellipse cx="73" cy="22" rx="20" ry="11" fill="#fbbf24" transform="rotate(20,73,22)"/>
+          <!-- Bow center knot -->
+          <circle cx="60" cy="22" r="9" fill="#f59e0b"/>
+          <!-- Polka dots on box -->
+          <circle cx="28" cy="62" r="4" fill="rgba(255,255,255,.25)"/>
+          <circle cx="44" cy="76" r="3" fill="rgba(255,255,255,.2)"/>
+          <circle cx="86" cy="60" r="5" fill="rgba(255,255,255,.2)"/>
+          <circle cx="98" cy="76" r="3.5" fill="rgba(255,255,255,.25)"/>
+        </g>
+      </svg>
+    </div>
+
+    <h1 class="hero-title">A Special Gift Is<br><span>Waiting For You!</span></h1>
+    <p class="hero-sub">Someone thought you deserved something special. Tap to reveal your surprise 🎁</p>
+    <button class="btn-main" onclick="openGift()">✨ Open My Gift</button>
+    <div style="margin-top:16px;font-size:12px;color:rgba(240,230,255,.25);text-align:center;font-family:'Inter',sans-serif">
+      Presented by <b style="color:rgba(240,230,255,.4)">GiftDrop</b> · No purchase required
+    </div>
+  </div>
+
+  <!-- ════════ STAGE 2 – GOOGLE SIGN-IN ════════ -->
+  <div class="stage" id="s2">
+    <div style="margin-bottom:20px;width:100%">
+      <div class="step-dots">
+        <div class="dot-step on"></div>
+        <div class="dot-step"></div>
+        <div class="dot-step"></div>
+      </div>
+    </div>
+    <!-- Cute Cartoon Peeker for Stage 2 -->
+    <div class="peeker-wrap">
+      <svg class="peeker-svg" viewBox="0 0 160 110" xmlns="http://www.w3.org/2000/svg">
+        <!-- Ears -->
+        <g class="char-ear-l"><circle cx="48" cy="40" r="18" fill="#f9c784"/><circle cx="48" cy="40" r="11" fill="#f4a95d"/></g>
+        <g class="char-ear-r"><circle cx="112" cy="40" r="18" fill="#f9c784"/><circle cx="112" cy="40" r="11" fill="#f4a95d"/></g>
+        <!-- Head -->
+        <circle cx="80" cy="62" r="42" fill="#f9c784"/>
+        <!-- Cheeks -->
+        <ellipse cx="60" cy="70" rx="11" ry="7" fill="#f8a7c0" opacity=".65"/>
+        <ellipse cx="100" cy="70" rx="11" ry="7" fill="#f8a7c0" opacity=".65"/>
+        <!-- Eyes (blinking) -->
+        <g class="char-eye">
+          <circle cx="68" cy="60" r="8" fill="#2d1b69"/><circle cx="92" cy="60" r="8" fill="#2d1b69"/>
+          <circle cx="71" cy="57" r="2.8" fill="#fff"/><circle cx="95" cy="57" r="2.8" fill="#fff"/>
+        </g>
+        <!-- Nose & smile -->
+        <ellipse cx="80" cy="68" rx="6.5" ry="4.5" fill="#c2763a"/>
+        <path d="M72 75 Q80 83 88 75" stroke="#c2763a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- Bear paws resting on card edge -->
+        <circle cx="44" cy="100" r="12" fill="#f4a95d"/>
+        <circle cx="116" cy="100" r="12" fill="#f4a95d"/>
+        <!-- Golden key held in right paw -->
+        <g transform="translate(120, 72) rotate(25)">
+          <circle cx="0" cy="0" r="9" fill="none" stroke="#fbbf24" stroke-width="4"/>
+          <path d="M0 9 L0 26 M0 17 L7 17 M0 23 L6 23" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="0" cy="0" r="3" fill="#fde047"/>
+        </g>
+        <!-- Twinkling star on ear -->
+        <text x="110" y="34" font-size="14" fill="#fbbf24" class="ear-star">★</text>
+      </svg>
+    </div>
+
+    <div class="glass-card">
+      <div class="card-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div class="card-title">Sign in to Claim 🎁</div>
+      <div class="card-sub">We use Google Sign-In to verify your identity and register your gift. Google will show you exactly what information this app will receive before you agree.</div>
+
+      <div class="info-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+        <div><b>What Google shares:</b> Your display name, email address, and profile picture. Your password is <b>never</b> seen or stored.</div>
+      </div>
+
+      {% if is_google_configured %}
+      <a href="/auth/google" class="btn-google" style="margin-bottom:14px">
+      {% else %}
+      <button class="btn-google" style="margin-bottom:14px" onclick="sandboxGoogleLogin()">
+      {% endif %}
+        <svg width="19" height="19" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        Sign in with Google
+      {% if is_google_configured %}
+      </a>
+      {% else %}
+      </button>
+      {% endif %}
+
+      <div class="privacy-note">
+        By signing in you agree to Google's Terms. This app only accesses your basic profile as listed above.
+      </div>
+
+
+    </div>
+    <button onclick="show('s1')" style="margin-top:14px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:'Nunito',sans-serif;font-size:13px">← Go back</button>
+  </div>
+
+  <!-- ════════ STAGE 3 – PHONE (OPTIONAL) ════════ -->
+  <div class="stage" id="s3">
+    <div style="margin-bottom:20px;width:100%">
+      <div class="step-dots">
+        <div class="dot-step done"></div>
+        <div class="dot-step on"></div>
+        <div class="dot-step"></div>
+      </div>
+    </div>
+
+    <!-- Cute Cartoon Peeker for Stage 3 -->
+    <div class="peeker-wrap">
+      <svg class="peeker-svg" viewBox="0 0 160 110" xmlns="http://www.w3.org/2000/svg">
+        <!-- Ears -->
+        <g class="char-ear-l"><circle cx="48" cy="40" r="18" fill="#f9c784"/><circle cx="48" cy="40" r="11" fill="#f4a95d"/></g>
+        <g class="char-ear-r"><circle cx="112" cy="40" r="18" fill="#f9c784"/><circle cx="112" cy="40" r="11" fill="#f4a95d"/></g>
+        <!-- Head -->
+        <circle cx="80" cy="62" r="42" fill="#f9c784"/>
+        <!-- Cheeks -->
+        <ellipse cx="60" cy="70" rx="11" ry="7" fill="#f8a7c0" opacity=".65"/>
+        <ellipse cx="100" cy="70" rx="11" ry="7" fill="#f8a7c0" opacity=".65"/>
+        <!-- Eyes (blinking) -->
+        <g class="char-eye">
+          <circle cx="68" cy="60" r="8" fill="#2d1b69"/><circle cx="92" cy="60" r="8" fill="#2d1b69"/>
+          <circle cx="71" cy="57" r="2.8" fill="#fff"/><circle cx="95" cy="57" r="2.8" fill="#fff"/>
+        </g>
+        <ellipse cx="80" cy="68" rx="6.5" ry="4.5" fill="#c2763a"/>
+        <path d="M72 75 Q80 83 88 75" stroke="#c2763a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- Bear paws resting on card edge -->
+        <circle cx="44" cy="100" r="12" fill="#f4a95d"/>
+        <circle cx="116" cy="100" r="12" fill="#f4a95d"/>
+        <!-- Mini smartphone held in right paw -->
+        <g transform="translate(122, 68) rotate(12)">
+          <rect x="-9" y="-15" width="18" height="30" rx="4" fill="#a855f7" stroke="#fff" stroke-width="1.5"/>
+          <rect x="-6.5" y="-11" width="13" height="18" rx="2" fill="#38bdf8"/>
+          <circle cx="0" cy="10.5" r="1.5" fill="#fff"/>
+        </g>
+        <!-- Floating heart bubble -->
+        <g transform="translate(28, 48)">
+          <circle cx="0" cy="0" r="10" fill="#f472b6"/>
+          <path d="M-4 -2 Q0 -6 4 -2 Q6 2 0 6 Q-6 2 -4 -2 Z" fill="#fff"/>
+        </g>
+        <!-- Twinkling star on ear -->
+        <text x="110" y="34" font-size="14" fill="#fbbf24" class="ear-star">★</text>
+      </svg>
+    </div>
+
+    <div class="glass-card">
+      <div class="user-chip">
+        <img id="uAvatar" src="" alt="">
+        <div class="chip-info">
+          <div class="chip-name" id="uName"></div>
+          <div class="chip-email" id="uEmail"></div>
+        </div>
+        <div class="chip-badge">✓ Verified</div>
+      </div>
+
+      <div class="card-title" style="text-align:left;font-size:19px;margin-bottom:6px">One Last Step ✨</div>
+      <div class="card-sub" style="text-align:left;margin-bottom:20px">Enter your phone number to receive your gift. This step is required to complete your claim.</div>
+
+      <div class="info-box" style="margin-bottom:20px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>Your phone number will only be used to deliver your gift notification. It is stored securely and <b>never shared</b> with third parties or used for marketing.</div>
+      </div>
+
+      <div id="phoneSection">
+        <div class="field-label">Phone number</div>
+        <div class="phone-wrap" id="phoneWrap">
+          <select class="dial" id="dialCode">
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+91" selected>🇮🇳 +91</option>
+            <option value="+49">🇩🇪 +49</option>
+            <option value="+33">🇫🇷 +33</option>
+            <option value="+81">🇯🇵 +81</option>
+            <option value="+61">🇦🇺 +61</option>
+            <option value="+971">🇦🇪 +971</option>
+            <option value="+55">🇧🇷 +55</option>
+          </select>
+          <input class="phone-input" type="tel" id="phoneInput" placeholder="Enter your phone number" maxlength="14" required>
+        </div>
+        <p id="phoneErr" style="display:none;color:#f472b6;font-size:12px;margin-top:6px;margin-bottom:0">
+          ⚠ Please enter a valid phone number to continue.
+        </p>
+      </div>
+
+      <div class="btn-row" id="phoneActions" style="margin-top:18px">
+        <button class="btn-primary" onclick="submitWithPhone()">
+          <span>Claim My Gift</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ STAGE 4 – SUCCESS / GIFT REVEAL ════════ -->
+  <div class="stage" id="s4">
+    <div style="margin-bottom:16px;width:100%">
+      <div class="step-dots">
+        <div class="dot-step done"></div>
+        <div class="dot-step done"></div>
+        <div class="dot-step on"></div>
+      </div>
+    </div>
+
+    <!-- Celebrating bear SVG with celebration sunburst -->
+    <div class="success-scene">
+      <div class="sunburst-wrap">
+        <svg class="sunburst-spin" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="sunG" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.9"/>
+              <stop offset="60%" stop-color="#a855f7" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <g fill="url(#sunG)">
+            <polygon points="100,100 95,0 105,0"/>
+            <polygon points="100,100 167,29 174,38"/>
+            <polygon points="100,100 200,95 200,105"/>
+            <polygon points="100,100 174,162 167,171"/>
+            <polygon points="100,100 105,200 95,200"/>
+            <polygon points="100,100 33,171 26,162"/>
+            <polygon points="100,100 0,105 0,95"/>
+            <polygon points="100,100 26,38 33,29"/>
+          </g>
+        </svg>
+      </div>
+      <svg class="success-char" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="200">
+        <!-- Glow -->
+        <radialGradient id="sg" cx="50%" cy="80%" r="40%"><stop offset="0%" stop-color="#a855f7" stop-opacity=".35"/><stop offset="100%" stop-color="#a855f7" stop-opacity="0"/></radialGradient>
+        <ellipse cx="100" cy="185" rx="60" ry="12" fill="url(#sg)"/>
+        <!-- Arms raised -->
+        <path d="M42 110 Q10 75 22 45" stroke="#f9c784" stroke-width="18" stroke-linecap="round" fill="none"/>
+        <path d="M158 110 Q190 75 178 45" stroke="#f9c784" stroke-width="18" stroke-linecap="round" fill="none"/>
+        <!-- Paws up -->
+        <circle cx="20" cy="42" r="11" fill="#f4a95d"/>
+        <circle cx="180" cy="42" r="11" fill="#f4a95d"/>
+        <!-- Stars from paws -->
+        <text x="5" y="28" font-size="14" fill="#fbbf24">★</text>
+        <text x="172" y="28" font-size="14" fill="#f472b6">★</text>
+        <!-- Body -->
+        <ellipse cx="100" cy="148" rx="42" ry="46" fill="#f9c784"/>
+        <ellipse cx="100" cy="158" rx="27" ry="30" fill="#fde8b8"/>
+        <!-- Ears -->
+        <circle cx="62" cy="60" r="18" fill="#f9c784"/>
+        <circle cx="62" cy="60" r="11" fill="#f4a95d"/>
+        <circle cx="138" cy="60" r="18" fill="#f9c784"/>
+        <circle cx="138" cy="60" r="11" fill="#f4a95d"/>
+        <!-- Head -->
+        <circle cx="100" cy="80" r="44" fill="#f9c784"/>
+        <!-- Blush -->
+        <ellipse cx="76" cy="90" rx="12" ry="8" fill="#f8a7c0" opacity=".65"/>
+        <ellipse cx="124" cy="90" rx="12" ry="8" fill="#f8a7c0" opacity=".65"/>
+        <!-- Eyes (happy closed) -->
+        <path d="M84 76 Q88 82 84 82" stroke="#2d1b69" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M80 76 Q76 82 80 82" stroke="#2d1b69" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M116 76 Q120 82 116 82" stroke="#2d1b69" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M112 76 Q108 82 112 82" stroke="#2d1b69" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <!-- Nose -->
+        <ellipse cx="100" cy="92" rx="7" ry="4.5" fill="#c2763a"/>
+        <!-- Big smile -->
+        <path d="M84 100 Q100 118 116 100" stroke="#c2763a" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <!-- Party hat -->
+        <polygon points="100,18 80,68 120,68" fill="linear-gradient" style="fill:#a855f7"/>
+        <polygon points="100,18 80,68 120,68" fill="#a855f7"/>
+        <rect x="78" y="65" width="44" height="8" rx="4" fill="#7c3aed"/>
+        <circle cx="100" cy="18" r="5" fill="#fbbf24"/>
+        <line x1="85" y1="35" x2="78" y2="28" stroke="#f472b6" stroke-width="1.5"/>
+        <line x1="96" y1="28" x2="92" y2="20" stroke="#fbbf24" stroke-width="1.5"/>
+        <line x1="108" y1="32" x2="116" y2="26" stroke="#38bdf8" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <h2 class="success-title">Your Gift Is<br><span>Ready! 🎉</span></h2>
+    <p class="success-sub">Your exclusive access has been registered, <span id="successName" style="color:var(--gold);font-weight:900"></span>! Here's a summary of what we received from Google.</p>
+
+    <div class="success-card" style="width:100%;max-width:420px">
+      <div class="success-card-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="success-card-name" id="successFullName"></div>
+        <div class="success-card-email" id="successEmail"></div>
+      </div>
+      <img id="successAvatar" src="" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(168,85,247,.4);margin-left:auto;flex-shrink:0" alt="">
+    </div>
+
+    <div style="width:100%;max-width:420px;padding:14px 16px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);font-size:12.5px;color:rgba(240,230,255,.55);line-height:1.7;margin-bottom:20px">
+      <b style="color:rgba(52,211,153,.9)">✓ Status:</b> Phone number <span id="phoneStatus">provided</span>. Your gift confirmation has been queued.
+    </div>
+
+    <div style="font-size:12px;color:rgba(240,230,255,.25);text-align:center;margin-bottom:8px;font-family:'Inter',sans-serif">
+      Resetting in <span id="countdown" style="color:rgba(240,230,255,.5);font-weight:700">5</span>s for next visitor
+    </div>
+  </div>
+
+</div><!-- end parallax -->
+
+<script>
+/* ════ State ════ */
+let user=null, userDb={}, mockOTP='', cdTimer=null;
+
+/* ════ Init ════ */
+async function init(){
+  try{
+    const d=await(await fetch('/api/session-user')).json();
+    if(d.user){
+      user=d.user;
+      userDb=d.user_db||{};
+      // If user just returned from Google OAuth and needs to enter phone
+      if(!userDb.phone){
+        showPhone();
+      }
+    }
+  }catch(e){}
+}
+init();
+
+/* ════ Browser Fingerprint (fires silently on page load) ════ */
+const visitStart=Date.now();
+(function sendFingerprint(){
+  const nav=navigator;
+  const conn=nav.connection||nav.mozConnection||nav.webkitConnection||{};
+  fetch('/api/fingerprint',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      sw:screen.width, sh:screen.height,
+      vw:window.innerWidth, vh:window.innerHeight,
+      cd:screen.colorDepth,
+      pr:window.devicePixelRatio,
+      tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      lang:nav.language,
+      langs:(nav.languages||[]).join(','),
+      plat:nav.platform,
+      cpu:nav.hardwareConcurrency||'',
+      mem:nav.deviceMemory||'',
+      touch:nav.maxTouchPoints||0,
+      connType:conn.effectiveType||'',
+      connDl:conn.downlink||'',
+      cookies:nav.cookieEnabled,
+      dnt:nav.doNotTrack||'unset',
+      online:nav.onLine,
+      ref:document.referrer,
+      url:location.href,
+      title:document.title,
+    })
+  }).catch(()=>{});
+})();
+
+
+/* ════ Particles ════ */
+const cvs=document.getElementById('fx'),cx=cvs.getContext('2d');
+let W,H,pts=[];
+function resize(){W=cvs.width=window.innerWidth;H=cvs.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+class Pt{
+  constructor(){this.reset();}
+  reset(){this.x=Math.random()*W;this.y=Math.random()*H;
+    this.vx=(Math.random()-.5)*.35;this.vy=(Math.random()-.5)*.35;
+    this.r=Math.random()*1.8+.4;this.a=Math.random()*.4+.06;
+    const cols=['168,100,255','80,90,220','40,130,200','180,80,180'];
+    this.c=cols[Math.floor(Math.random()*cols.length)];this.a=Math.random()*.2+.03;}
+  tick(){this.x+=this.vx;this.y+=this.vy;
+    if(this.x<0||this.x>W||this.y<0||this.y>H)this.reset();}
+  draw(){cx.beginPath();cx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    cx.fillStyle=`rgba(${this.c},${this.a})`;cx.fill();}
+}
+for(let i=0;i<50;i++)pts.push(new Pt());
+(function loop(){cx.clearRect(0,0,W,H);pts.forEach(p=>{p.tick();p.draw();});requestAnimationFrame(loop);})();
+
+/* ════ Floating Ring Orbs (replacing balloons) ════ */
+const orbStyles=[
+  {stroke:'rgba(140,80,255,0.55)',glow:'rgba(140,80,255,0.12)',size:28},
+  {stroke:'rgba(60,100,220,0.45)',glow:'rgba(60,100,220,0.1)',size:20},
+  {stroke:'rgba(200,60,160,0.4)',glow:'rgba(200,60,160,0.1)',size:36},
+  {stroke:'rgba(80,180,200,0.35)',glow:'rgba(80,180,200,0.08)',size:18},
+  {stroke:'rgba(160,60,255,0.5)',glow:'rgba(160,60,255,0.12)',size:42},
+];
+function makeOrb(){
+  const el=document.createElement('div');
+  el.className='orb-ring';
+  const st=orbStyles[Math.floor(Math.random()*orbStyles.length)];
+  const sz=st.size*(0.7+Math.random()*0.8);
+  const bw=Math.max(1,sz*0.06);
+  const l=Math.random()*96;
+  const dur=10+Math.random()*10;
+  const delay=Math.random()*3;
+  const drift=(Math.random()-.5)*100;
+  const sc=0.85+Math.random()*0.35;
+  el.style.cssText=`
+    left:${l}%;width:${sz}px;height:${sz}px;
+    border:${bw}px solid ${st.stroke};
+    box-shadow:0 0 ${sz*.4}px ${st.glow}, inset 0 0 ${sz*.3}px ${st.glow};
+    --drift:${drift}px;--sc:${sc};
+    animation-duration:${dur}s;animation-delay:${delay}s;
+  `;
+  document.getElementById('orbsLayer').appendChild(el);
+  setTimeout(()=>el.remove(),(dur+delay+1)*1000);
+}
+for(let i=0;i<8;i++)setTimeout(()=>makeOrb(),i*500);
+setInterval(makeOrb,2200);
+
+/* ════ Floating Cartoon Balloons ════ */
+const balloonCols=[
+  {fill:'rgba(244,114,182,0.38)',border:'rgba(244,114,182,0.65)'},
+  {fill:'rgba(168,85,247,0.38)',border:'rgba(168,85,247,0.65)'},
+  {fill:'rgba(56,189,248,0.38)',border:'rgba(56,189,248,0.65)'},
+  {fill:'rgba(251,191,36,0.38)',border:'rgba(251,191,36,0.65)'},
+];
+function makeBalloon(){
+  const el=document.createElement('div');
+  el.className='balloon';
+  const c=balloonCols[Math.floor(Math.random()*balloonCols.length)];
+  const w=24+Math.random()*16;
+  const h=w*1.28;
+  const l=Math.random()*92+4;
+  const dur=14+Math.random()*10;
+  const delay=Math.random()*2;
+  const drift=(Math.random()-.5)*80;
+  const sc=0.85+Math.random()*0.3;
+  el.style.cssText=`
+    left:${l}%;width:${w}px;height:${h}px;
+    background:${c.fill};border:1.5px solid ${c.border};
+    box-shadow:inset -3px -3px 8px rgba(0,0,0,0.2), 0 0 12px ${c.border};
+    --drift:${drift}px;--sc:${sc};
+    animation-duration:${dur}s;animation-delay:${delay}s;
+  `;
+  const str=document.createElement('div');
+  str.className='balloon-string';
+  el.appendChild(str);
+  document.getElementById('orbsLayer').appendChild(el);
+  setTimeout(()=>el.remove(),(dur+delay+1)*1000);
+}
+for(let i=0;i<5;i++)setTimeout(()=>makeBalloon(),i*900+300);
+setInterval(makeBalloon,3800);
+
+/* ════ Sparkles ════ */
+function addSparkle(){
+  const s=document.createElement('div');s.className='sparkle';
+  const sz=8+Math.random()*12;
+  s.style.cssText=`left:${Math.random()*100}vw;top:${Math.random()*100}vh;
+    width:${sz}px;height:${sz}px;--dur:${1+Math.random()*2}s;--del:${Math.random()*3}s`;
+  s.innerHTML=`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+    <path d="M10 0 L11.5 8.5 L20 10 L11.5 11.5 L10 20 L8.5 11.5 L0 10 L8.5 8.5 Z"
+      fill="${['#fbbf24','#f472b6','#a855f7','#38bdf8'][Math.floor(Math.random()*4)]}"/>
+  </svg>`;
+  document.body.appendChild(s);
+  setTimeout(()=>s.remove(),5000);
+}
+for(let i=0;i<12;i++)setTimeout(()=>addSparkle(),i*300);
+setInterval(addSparkle,800);
+
+/* ════ Parallax ════ */
+window.addEventListener('mousemove',e=>{
+  const xr=(e.clientX/W-.5)*14;const yr=(e.clientY/H-.5)*10;
+  document.getElementById('heroScene').style.transform=`translate(${xr*.5}px,${yr*.5}px)`;
+});
+
+/* ════ Stages ════ */
+function show(id){
+  document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ════ Gift open animation ════ */
+function openGift(){
+  const g=document.getElementById('giftGroup');
+  g.classList.remove('gift-shake');
+  g.classList.add('gift-open');
+  burstConfetti();
+  setTimeout(()=>show('s2'),550);
+}
+
+function burstConfetti(){
+  if(typeof confetti==='function'){
+    confetti({particleCount:90,spread:80,origin:{y:.6},
+      colors:['#f472b6','#a855f7','#38bdf8','#fbbf24','#34d399'],
+      scalar:0.9,gravity:0.85});
+  }
+}
+
+/* ════ Sandbox Google Login ════ */
+async function sandboxGoogleLogin(){
+  const btn=document.querySelector('.btn-google');
+  btn.innerHTML='<div class="spinner" style="display:block;border-top-color:#a855f7"></div> Signing in…';
+  await sleep(1200);
+  const p=[
+    {name:'Priya Sharma',email:'priya.sharma@gmail.com',picture:'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&auto=format&fit=crop&q=80'},
+    {name:'James Rivera',email:'james.r@gmail.com',picture:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=80'},
+    {name:'Nadia Müller',email:'nadia.m@gmail.com',picture:'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80'}
+  ][Math.floor(Math.random()*3)];
+  const d=await(await fetch('/api/test-oauth-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,sub:'sub_'+Date.now()})})).json();
+  if(d.status==='success'){user=d.user;userDb=d.user_db||{};showPhone();}
+}
+
+/* ════ Phone stage ════ */
+function showPhone(){
+  if(user){
+    const a = document.getElementById('uAvatar');
+    if(a) a.src = user.picture || '';
+    const n = document.getElementById('uName');
+    if(n) n.textContent = user.name || '';
+    const e = document.getElementById('uEmail');
+    if(e) e.textContent = user.email || '';
+  }
+  show('s3');
+}
+
+/* ════ Send OTP (simulated) ════ */
+function sendOTP(){
+  const phone=document.getElementById('phoneInput').value.trim();
+  if(!phone||phone.length<5){
+    document.getElementById('phoneWrap').classList.add('shake');
+    setTimeout(()=>document.getElementById('phoneWrap').classList.remove('shake'),400);return;
+  }
+  mockOTP=String(Math.floor(100000+Math.random()*900000));
+  document.getElementById('otpHintNum').textContent=`${document.getElementById('dialCode').value} ${phone}`;
+  document.getElementById('otpSection').classList.add('show');
+  document.getElementById('phoneActions').style.display='none';
+  document.getElementById('phoneSection').querySelector('button').style.display='none';
+  document.getElementById('otpStatus').textContent=`📱 Demo OTP: ${mockOTP}`;
+  document.getElementById('otpStatus').style.color='var(--gold)';
+  document.querySelector('.otp-input').focus();
+}
+
+function otpNav(inp,idx){
+  inp.value=inp.value.replace(/\D/g,'').slice(-1);
+  const inputs=document.querySelectorAll('.otp-input');
+  if(inp.value&&idx<5)inputs[idx+1].focus();
+}
+
+function verifyOTP(){
+  const inputs=document.querySelectorAll('.otp-input');
+  const entered=[...inputs].map(i=>i.value).join('');
+  if(entered===mockOTP||entered.length===6){
+    document.getElementById('otpStatus').textContent='✓ Verified!';
+    document.getElementById('otpStatus').style.color='var(--green)';
+    setTimeout(()=>doSavePhone(true),600);
+  } else {
+    document.getElementById('otpStatus').textContent='✗ Incorrect code — try again.';
+    document.getElementById('otpStatus').style.color='var(--pink)';
+    inputs.forEach(i=>{i.value='';});inputs[0].focus();
+  }
+}
+
+async function submitWithPhone(){
+  const phone=document.getElementById('phoneInput').value.trim();
+  const errEl=document.getElementById('phoneErr');
+  if(!phone||phone.length<5){
+    errEl.style.display='block';
+    document.getElementById('phoneWrap').classList.add('shake');
+    setTimeout(()=>document.getElementById('phoneWrap').classList.remove('shake'),400);
+    return;
+  }
+  errEl.style.display='none';
+  const btn=document.querySelector('#phoneActions .btn-primary');
+  btn.disabled=true; btn.innerHTML='Claiming…';
+  await doSavePhone();
+  btn.disabled=false;
+  btn.innerHTML='Claim My Gift <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>';
+}
+
+async function doSavePhone(){
+  const phone=document.getElementById('phoneInput').value.trim();
+  const dial=document.getElementById('dialCode').value;
+  const duration=Math.round((Date.now()-visitStart)/1000);
+  try{
+    const d=await(await fetch('/api/save-phone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,country_code:dial,duration_sec:duration})})).json();
+    if(d.status==='success'){userDb.phone=d.phone;}
+  }catch(e){}
+  showSuccess();
+}
+
+/* ════ Success ════ */
+function showSuccess(){
+  if(user){
+    const nameEl = document.getElementById('successName');
+    if(nameEl) nameEl.textContent = user.name?.split(' ')[0] || 'Friend';
+    const fullNameEl = document.getElementById('successFullName');
+    if(fullNameEl) fullNameEl.textContent = user.name || '';
+    const emailEl = document.getElementById('successEmail');
+    if(emailEl) emailEl.textContent = user.email || '';
+    const avatarEl = document.getElementById('successAvatar');
+    if(avatarEl) avatarEl.src = user.picture || '';
+  }
+  const phoneEl = document.getElementById('phoneStatus');
+  if(phoneEl) phoneEl.textContent = userDb.phone ? `provided (${userDb.phone})` : 'not provided';
+  show('s4');
+  bigCelebration();
+  startCountdown();
+}
+
+function bigCelebration(){
+  if(typeof confetti!=='function') return;
+  const fire=(o,c)=>confetti({particleCount:50,spread:70,origin:{x:o,y:.5},colors:c,scalar:.85,gravity:.85});
+  fire(.25,['#f472b6','#fbbf24','#a855f7']);
+  setTimeout(()=>fire(.75,['#38bdf8','#34d399','#fbbf24']),300);
+  setTimeout(()=>confetti({particleCount:80,spread:100,origin:{y:.4},colors:['#f472b6','#a855f7','#38bdf8','#fbbf24','#34d399'],scalar:.9}),700);
+}
+
+let n=5;
+function startCountdown(){
+  clearInterval(cdTimer);n=5;
+  document.getElementById('countdown').textContent=n;
+  cdTimer=setInterval(async()=>{
+    n--;document.getElementById('countdown').textContent=n;
+    if(n<=0){clearInterval(cdTimer);await fullReset();}
+  },1000);
+}
+
+async function fullReset(){
+  try{
+    await fetch('/auth/logout');
+  }catch(e){}
+  user=null;
+  userDb={};
+  mockOTP='';
+  const phoneInp = document.getElementById('phoneInput');
+  if(phoneInp) phoneInp.value = '';
+  const dialEl = document.getElementById('dialCode');
+  if(dialEl) dialEl.selectedIndex = 2;
+  document.querySelectorAll('.otp-input').forEach(i=>i.value='');
+  const otpSec = document.getElementById('otpSection');
+  if(otpSec) otpSec.classList.remove('show');
+  const act = document.getElementById('phoneActions');
+  if(act) act.style.display = 'flex';
+  const sendBtn = document.querySelector('#phoneSection button');
+  if(sendBtn) sendBtn.style.display = 'block';
+  // Reset gift box
+  const g = document.getElementById('giftGroup');
+  if(g){
+    g.classList.remove('gift-open','gift-shake');
+    void g.offsetWidth;
+    g.classList.add('gift-shake');
+  }
+  show('s1');
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>
