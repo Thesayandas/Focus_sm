@@ -7,7 +7,9 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(ENV_PATH, override=True)
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+# Allow OAuth over HTTP only on localhost (Vercel uses HTTPS so this is not needed there)
+if os.getenv("VERCEL") is None:
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-neon-key-2026")
@@ -87,19 +89,24 @@ def parse_ua(ua: str) -> dict:
     return {"browser": br, "browser_version": ver, "os": os_n, "device_type": dev}
 
 def save_to_csv(record: dict):
-    exists = os.path.isfile(CSV_FILE)
-    with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
-        if not exists:
-            writer.writeheader()
-        writer.writerow({k: record.get(k, "") for k in CSV_FIELDS})
     try:
-        email = str(record.get('email', '-')).encode('ascii', errors='replace').decode('ascii')
-        phone = str(record.get('phone', '-')).encode('ascii', errors='replace').decode('ascii')
-        ip = str(record.get('ip_address', '-')).encode('ascii', errors='replace').decode('ascii')
-        print(f"[CSV] [+] {email} | {phone} | {ip} | {record.get('browser','?')} / {record.get('os','?')}")
-    except Exception:
-        pass
+        exists = os.path.isfile(CSV_FILE)
+        with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+            if not exists:
+                writer.writeheader()
+            writer.writerow({k: record.get(k, "") for k in CSV_FIELDS})
+        try:
+            email = str(record.get('email', '-')).encode('ascii', errors='replace').decode('ascii')
+            phone = str(record.get('phone', '-')).encode('ascii', errors='replace').decode('ascii')
+            ip = str(record.get('ip_address', '-')).encode('ascii', errors='replace').decode('ascii')
+            print(f"[CSV] [+] {email} | {phone} | {ip} | {record.get('browser','?')} / {record.get('os','?')}")
+        except Exception:
+            pass
+    except OSError:
+        # Vercel has a read-only filesystem - CSV writes are skipped on serverless
+        print("[CSV] Skipped (read-only filesystem - use a database for production)")
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.route("/")
